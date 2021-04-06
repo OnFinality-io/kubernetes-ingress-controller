@@ -86,12 +86,11 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// build a new cache store from the objects present in the configuration secret
-	objs := make([]interface{}, 0, len(configSecret.Data))
-	for gvk, yaml := range configSecret.Data {
-		fmt.Println(gvk)
-		objs = append(objs, yaml)
+	yamls := make([][]byte, 0, len(configSecret.Data))
+	for _, yaml := range configSecret.Data {
+		yamls = append(yamls, yaml)
 	}
-	cache, err := store.NewCacheStoresFromObjs(objs)
+	cache, err := store.NewCacheStoresFromObjYAML(yamls...)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

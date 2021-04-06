@@ -28,8 +28,11 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
+	yamlserializer "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/tools/cache"
 	knative "knative.dev/networking/pkg/apis/networking/v1alpha1"
@@ -118,6 +121,25 @@ type CacheStores struct {
 	Configuration cache.Store
 
 	KnativeIngress cache.Store
+}
+
+// NewCacheStoresFromObjYAML provides a new CacheStores object given any number of byte arrays containing
+// YAML Kubernetes objects. An error is returned if any provided YAML was not a valid Kubernetes object.
+func NewCacheStoresFromObjYAML(objs ...[]byte) (c CacheStores, err error) {
+	kobjs := make([]runtime.Object, 0, len(objs))
+	for _, yaml := range objs {
+		sr := serializer.NewYAMLSerializer(
+			yamlserializer.DefaultMetaFactory,
+			unstructuredscheme.NewUnstructuredCreator(),
+			unstructuredscheme.NewUnstructuredObjectTyper(),
+		)
+		kobj, _, decodeErr := sr.Decode(yaml, nil, nil)
+		if err = decodeErr; err != nil {
+			return
+		}
+		kobjs = append(kobjs, kobj)
+	}
+	return NewCacheStoresFromObjs(kobjs...)
 }
 
 // NewCacheStoresFromObjs provides a new CacheStores object given any number of Kubernetes
