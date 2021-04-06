@@ -21,16 +21,17 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/kong/kubernetes-ingress-controller/pkg/deckgen"
-	"github.com/kong/kubernetes-ingress-controller/pkg/parser"
-	"github.com/kong/kubernetes-ingress-controller/pkg/sendconfig"
-	"github.com/kong/kubernetes-ingress-controller/railgun/pkg/store"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	"github.com/kong/kubernetes-ingress-controller/pkg/deckgen"
+	"github.com/kong/kubernetes-ingress-controller/pkg/parser"
+	"github.com/kong/kubernetes-ingress-controller/pkg/sendconfig"
+	"github.com/kong/kubernetes-ingress-controller/pkg/store"
 )
 
 type SecretReconcilerParams struct {
