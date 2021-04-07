@@ -23,11 +23,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/tools/cache"
 	knative "knative.dev/networking/pkg/apis/networking/v1alpha1"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kong/kubernetes-ingress-controller/pkg/annotations"
 	configurationv1 "github.com/kong/kubernetes-ingress-controller/pkg/apis/configuration/v1"
@@ -123,6 +124,24 @@ type CacheStores struct {
 	KnativeIngress cache.Store
 }
 
+// NewCacheStores is a convenience function for CacheStores to initialize all attributes with new cache stores
+func NewCacheStores() CacheStores {
+	c := CacheStores{}
+	c.ClusterPlugin = cache.NewStore(keyFunc)
+	c.Configuration = cache.NewStore(keyFunc)
+	c.Consumer = cache.NewStore(keyFunc)
+	c.Endpoint = cache.NewStore(keyFunc)
+	c.IngressV1 = cache.NewStore(keyFunc)
+	c.IngressV1beta1 = cache.NewStore(keyFunc)
+	c.KnativeIngress = cache.NewStore(keyFunc)
+	c.Plugin = cache.NewStore(keyFunc)
+	c.Secret = cache.NewStore(keyFunc)
+	c.Service = cache.NewStore(keyFunc)
+	c.TCPIngress = cache.NewStore(keyFunc)
+	c.UDPIngress = cache.NewStore(keyFunc)
+	return c
+}
+
 // NewCacheStoresFromObjYAML provides a new CacheStores object given any number of byte arrays containing
 // YAML Kubernetes objects. An error is returned if any provided YAML was not a valid Kubernetes object.
 func NewCacheStoresFromObjYAML(objs ...[]byte) (c CacheStores, err error) {
@@ -147,34 +166,183 @@ func NewCacheStoresFromObjYAML(objs ...[]byte) (c CacheStores, err error) {
 // sub-storage (e.g. IngressV1, TCPIngress, e.t.c.) but will produce an error if any of the
 // input objects are erroneous or otherwise unusable as Kubernetes objects.
 func NewCacheStoresFromObjs(objs ...runtime.Object) (c CacheStores, err error) {
+	c = NewCacheStores()
 	for _, obj := range objs {
-		switch obj := obj.(type) {
-		case *v1beta1.Ingress:
+		_, isUnstructured := obj.(*unstructured.Unstructured)
+		switch gvk := obj.GetObjectKind().GroupVersionKind().String(); gvk {
+		case "extensions.k8s.io/v1beta1, Kind=Ingress":
+			// FIXME - I'm putting these encode/decode steps in as a hack right now to get things working,
+			//         and because I can't remember a good way to convert unstructured to the respective
+			//         type for the k8s object. I'll read back through client-go later and get this figured out.
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := extensions.Ingress{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.IngressV1beta1.Add(obj)
-		case *networkingv1.Ingress:
+		case "networking.k8s.io/v1, Kind=Ingress":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := networkingv1.Ingress{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.IngressV1.Add(obj)
-		case *configurationv1beta1.TCPIngress:
+		case "configuration.konghq.com/v1beta1, Kind=TCPIngress":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := configurationv1beta1.TCPIngress{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.TCPIngress.Add(obj)
-		case *configurationv1alpha1.UDPIngress:
+		case "configuration.konghq.com/v1alpha1, Kind=UDPIngress":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := configurationv1alpha1.UDPIngress{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.UDPIngress.Add(obj)
-		case *corev1.Service:
+		case "core.k8s.io/v1, Kind=Service":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := corev1.Service{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.Service.Add(obj)
-		case *corev1.Secret:
+		case "core.k8s.io/v1, Kind=Secret":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := corev1.Secret{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.Secret.Add(obj)
-		case *corev1.Endpoints:
+		case "core.k8s.io/v1, Kind=Endpoints":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := corev1.Endpoints{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.Endpoint.Add(obj)
-		case *configurationv1.KongPlugin:
+		case "configuration.konghq.com/v1, Kind=KongPlugin":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := configurationv1.KongPlugin{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.Plugin.Add(obj)
-		case *configurationv1.KongClusterPlugin:
+		case "configuration.konghq.com/v1, Kind=KongClusterPlugin":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := configurationv1.KongClusterPlugin{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.ClusterPlugin.Add(obj)
-		case *configurationv1.KongConsumer:
+		case "configuration.konghq.com/v1, Kind=KongConsumer":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := configurationv1.KongConsumer{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.Consumer.Add(obj)
-		case *configurationv1.ConfigSource:
+		case "configuration.konghq.com/v1, Kind=ConfigSource":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := configurationv1.ConfigSource{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.Configuration.Add(obj)
-		case *knative.Ingress:
+		case "fixme.knative.dev/v1, Kind=Ingress":
+			if isUnstructured {
+				var b []byte
+				b, err = yaml.Marshal(obj)
+				if err != nil {
+					return
+				}
+				ing := knative.Ingress{}
+				if err = yaml.Unmarshal(b, &ing); err != nil {
+					return
+				}
+				obj = &ing
+			}
 			err = c.KnativeIngress.Add(obj)
 		default:
-			err = fmt.Errorf("%s is not a supported runtime.Object", reflect.TypeOf(obj))
+			err = fmt.Errorf("%s is not a supported runtime.Object", gvk)
 			return
 		}
 		if err != nil {
