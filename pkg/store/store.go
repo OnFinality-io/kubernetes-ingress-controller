@@ -229,7 +229,7 @@ func NewCacheStoresFromObjs(objs ...runtime.Object) (c CacheStores, err error) {
 				obj = &ing
 			}
 			err = c.UDPIngress.Add(obj)
-		case "core.k8s.io/v1, Kind=Service":
+		case "/v1, Kind=Service":
 			if isUnstructured {
 				var b []byte
 				b, err = yaml.Marshal(obj)
@@ -243,7 +243,7 @@ func NewCacheStoresFromObjs(objs ...runtime.Object) (c CacheStores, err error) {
 				obj = &ing
 			}
 			err = c.Service.Add(obj)
-		case "core.k8s.io/v1, Kind=Secret":
+		case "/v1, Kind=Secret":
 			if isUnstructured {
 				var b []byte
 				b, err = yaml.Marshal(obj)
@@ -257,7 +257,7 @@ func NewCacheStoresFromObjs(objs ...runtime.Object) (c CacheStores, err error) {
 				obj = &ing
 			}
 			err = c.Secret.Add(obj)
-		case "core.k8s.io/v1, Kind=Endpoints":
+		case "/v1, Kind=Endpoints":
 			if isUnstructured {
 				var b []byte
 				b, err = yaml.Marshal(obj)
